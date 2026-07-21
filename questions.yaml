@@ -1,0 +1,37 @@
+# Questions the comparison tool asks about each section.
+# Same questions every run so results are comparable. Edit freely.
+
+- section: Cover Letter
+  question: >
+    Compare the cover letters. Which one better hooks the reader, shows
+    understanding of this specific project, and avoids generic boilerplate?
+
+- section: Project Manager & Resumes
+  question: >
+    Compare the project manager and key staff resumes. Which team looks like
+    the safer choice for THIS project? Consider relevant named projects,
+    local/district relationships, and whether experience is specific or generic.
+
+- section: Technical Approach
+  question: >
+    Compare the technical approach sections. Does each firm present a locked-in
+    solution or a process for finding one (red flags to investigate, risks to
+    manage)? Which reads like they already understand this project's specific
+    problems? Which would a selection committee trust more?
+
+- section: Project Experience
+  question: >
+    Compare the past project experience. Which firm's examples are closer to
+    this exact project type, location, and client? Are results quantified?
+
+- section: Graphics & Layout
+  question: >
+    Based on references to figures, maps, schedules, and exhibits in the text,
+    compare how each firm uses graphics to tell the project story. What is
+    each showing that the other is not?
+
+- section: Overall
+  question: >
+    Overall verdict: score both proposals against the scoring criteria,
+    pick the likely winner, and list the top 3 concrete changes VS should
+    make on the next LOI of this type.

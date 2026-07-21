@@ -1,0 +1,61 @@
+# Tagging rules for the project profile indexer (src/profiles.py).
+#
+# This is the file to grow as we see the proposal coordinator's real profiles:
+# every entry is tag_name: [list of phrases that imply it]. Matching is
+# case-insensitive and looks at the profile's full text plus its folder name
+# (profiles are already foldered by service type, so folder names count).
+
+# Folders inside the profiles directory to skip when indexing (archives,
+# drafts, templates, photo dumps). Matched against folder names in the path,
+# case-insensitive.
+exclude_folders:
+  - PP ARCHIVES
+  - PP Images
+  - PP Master Tracking Sheet
+  - PP Template
+  - PP Revamp
+  - Rough Drafts
+  - Old Project Profile
+  - DRONE PHOTOS
+  - To be converted
+  - Public Engagement Photos
+
+service:
+  roadway: [roadway, road reconstruction, street reconstruction, pavement, resurfacing, intersection]
+  bridge: [bridge, small structure, culvert]
+  drainage: [drainage, stormwater, storm sewer, detention, floodplain, hydraulics]
+  water_utility: [water main, waterline, water line, sanitary sewer, pipe replacement, utility relocation]
+  survey: [survey, right-of-way, right of way, land acquisition]
+  environmental: [environmental, wetland, permitting, nepa]
+  trail: [trail, greenway, pedestrian, sidewalk, multi-use path]
+  site_development: [site development, site design, parking, campus, park improvements]
+  structural: [structural, retaining wall]
+  traffic: [traffic, signal, signage, roundabout]
+
+# City/county -> region. Starter list from the meeting; extend freely.
+geography:
+  central_indiana: [indianapolis, greenwood, brownsburg, lebanon, carmel, fishers, noblesville, avon, plainfield, boone county, hamilton county, marion county, hendricks county, johnson county]
+  northern_indiana: [la porte, laporte, warsaw, south bend, gary, fort wayne, elkhart, valparaiso, michigan city]
+  southern_indiana: [evansville, jeffersonville, new albany, bloomington, columbus, terre haute]
+  kentucky: [kentucky, louisville, lexington]
+  ohio: [ohio, columbus office, cincinnati, dayton]
+
+clients:
+  indot: [indot, indiana department of transportation]
+  lpa: [lpa, local public agency]
+  purdue: [purdue]
+  iu_health: [iu health, indiana university health]
+
+# Names to capture into the "people" field when they appear in a profile.
+# TODO: confirm spellings against the real org chart (these are from the
+# meeting transcript, which mangles names).
+people:
+  - Sam Anderson
+  - Jordan Bennett
+  - Taylor Carver
+  - Casey Dawson
+  - Drew Ellery
+  - Riley Fenwick
+  - Morgan Grayson
+  - Avery
+  - Jordan Kendrick

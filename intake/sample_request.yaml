@@ -1,0 +1,23 @@
+# Sample intake request — the structured "kickoff" data for one pre-proposal.
+# Today this is filled in by hand. After the meeting, this gets populated by
+# whatever the real trigger is (email, form, CRM). The field list will grow
+# to match what the proposal coordinator actually needs.
+
+client_name: Acme Development Group
+client_contact: Jane Smith, VP of Development
+project_name: Riverside Commons Mixed-Use Development
+project_location: Indianapolis, IN
+project_type: Mixed-use commercial/residential
+services_requested:
+  - Civil site design
+  - Stormwater management
+  - Utility coordination
+request_summary: >
+  Client is planning a 4-acre mixed-use development along the White River
+  corridor. They need site/civil engineering services from concept through
+  construction documents. Initial site has known drainage challenges and
+  a floodplain boundary on the east parcel.
+due_date: 2026-07-20
+notes: >
+  Referred by previous client. Client mentioned budget sensitivity and an
+  aggressive schedule — wants to break ground spring 2027.

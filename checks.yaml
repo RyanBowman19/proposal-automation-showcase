@@ -1,0 +1,114 @@
+# Word lists for the LOI checker. Add to these freely.
+
+# Clients we write LOIs for. If the checker is told the right one
+# (--client INDOT), any other name from this list gets flagged.
+clients:
+  - INDOT
+  - KYTC
+  - City of Plymouth
+  - City of South Bend
+  - City of Culver
+  - Town of Culver
+  - NIRPC
+
+# Words the spell checker should not flag. Add names and jargon here
+# whenever the checker flags something that's actually fine.
+ok_words:
+  - indot
+  - kytc
+  - loi
+  - rci
+  - rcut
+  - riro
+  - propel
+  - nepa
+  - mppa
+  - csgp
+  - lust
+  - cfer
+  - mot
+  - stip
+  - pel
+  - des
+  - anderson
+  - bennett
+  - carver
+  - dawson
+  - ellery
+  - fenwick
+  - grayson
+  - holloway
+  - lochmueller
+  - roundabout
+  - roundabouts
+  - signalized
+  - unsignalized
+  - constructability
+  - floodplain
+  - floodplains
+  - stormwater
+  - subconsultant
+  - subconsultants
+  - prequalification
+  - deliverables
+  - geotechnical
+  - hydraulics
+  - laporte
+  - starke
+  - westfield
+  - plymouth
+  - logansport
+  - thackeray
+  - dogbone
+  - stantec
+  - comcast
+  - mediacom
+  - brightspeed
+  - nipsco
+  - remc
+  - usace
+  - idem
+  - pccp
+  - cesswi
+  - rabs
+  - workshare
+  - queueing
+  - subdistricts
+  - prelim
+  - coord
+  - elec
+  - piler
+  - jordan
+  - kendrick
+  - lindqvist
+  - marsh
+  - norwood
+  - osei
+  - pruitt
+  - quinlan
+  - rourke
+  - dawson
+  - sato
+  - relocations
+  - issuances
+  - osha
+  - fhwa
+  - aadt
+  - minimis
+  - multi
+  - approx
+  - ipac
+  - ihcp
+  - cpesc
+  - ptoe
+  - wingwall
+  - wingwalls
+  - floodway
+  - roadmap
+  - brownstown
+  - clifty
+  - caney
+  - underwood
+  - vance
+  - whitfield
+  - yamada

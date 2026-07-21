@@ -1,0 +1,10 @@
+.venv/
+__pycache__/
+output/
+reference/
+.env
+profiles_index.json
+resumes_index.json
+notes/
+sample_data/
+/*.pdf

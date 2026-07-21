@@ -1,0 +1,40 @@
+# Proposal pipeline configuration.
+# The section list defines the document structure — reorder, add, or remove
+# sections here after learning the proposal coordinator's real workflow. No code changes needed.
+#
+# mode: boilerplate  -> copied verbatim from content_library/<source>
+# mode: ai           -> drafted by Claude from the intake + library context
+
+company:
+  name: VS Engineering
+  # Add address, license numbers, etc. once confirmed
+
+model: claude-opus-4-8
+
+sections:
+  - id: cover_letter
+    title: Cover Letter
+    mode: ai
+
+  - id: company_overview
+    title: Company Overview
+    mode: boilerplate
+    source: company_overview.md
+
+  - id: project_understanding
+    title: Project Understanding
+    mode: ai
+
+  - id: scope_of_services
+    title: Scope of Services
+    mode: ai
+
+  - id: relevant_experience
+    title: Relevant Experience
+    mode: boilerplate
+    source: qualifications.md
+
+  - id: standard_terms
+    title: Standard Terms & Conditions
+    mode: boilerplate
+    source: standard_terms.md
