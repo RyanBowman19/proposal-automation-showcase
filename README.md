@@ -7,6 +7,24 @@ the private company data behind it is not.*
 
 Tools to save the proposal coordinator time on LOIs.
 
+## See it in action
+
+![Search demo](demo_data/vs-search-demo.gif)
+
+That's the real server, running against fake sample data (demo_data/) instead
+of real company files - a couple of made-up resumes and project profiles.
+To run it yourself:
+
+    py -m pip install -r requirements.txt
+    py -m src.resumes index demo_data/resumes
+    py -m src.profiles index demo_data/profiles
+    py demo_data/run_demo_server.py
+
+Then open http://127.0.0.1:8790. The LOI Tools tab is in there too - upload
+demo_data/Sample-Draft-LOI.pdf and it'll catch the wrong RFP number and
+typos planted in it. The AI comparison half needs an Anthropic API key to
+actually run (see the LOI comparison section below), so it's not in the demo.
+
 ## Status
 
 1. Project + resume search - DONE
