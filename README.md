@@ -20,7 +20,7 @@ To run it yourself:
     py -m src.profiles index demo_data/profiles
     py demo_data/run_demo_server.py
 
-Then open http://127.0.0.1:8790. The LOI Tools tab is in there too - upload
+Then open the address it prints in the console. The LOI Tools tab is in there too - upload
 demo_data/Sample-Draft-LOI.pdf and it'll catch the wrong RFP number and
 typos planted in it. The AI comparison half needs an Anthropic API key to
 actually run (see the LOI comparison section below), so it's not in the demo.
@@ -58,8 +58,8 @@ Double-click **Search Projects.bat**. Two tabs: Projects and Resumes.
 Type "signals" in Resumes to find people with signal experience.
 Leave the black window open - closing it stops the search.
 
-Other office computers: use the http://<ip>:8765 address shown in the
-black window. First time, click Allow on the firewall popup.
+Other office computers: use the address shown in the black window.
+First time, click Allow on the firewall popup.
 
 Remote users: need the VPN, or just copy this folder to their laptop
 and run it there.

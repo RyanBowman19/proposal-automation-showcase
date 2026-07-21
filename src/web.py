@@ -1,6 +1,6 @@
 """The search page. Run with Search Projects.bat (or py -m src.web).
 
-Other computers can open it at http://<this pc's ip>:8765.
+Other computers can open it at the address this prints on startup.
 Search only - nothing here can change the source files. The LOI Tools tab
 is the exception: it saves an uploaded PDF and writes reports to output/,
 using src.check/src.compare/src.review under the hood.
