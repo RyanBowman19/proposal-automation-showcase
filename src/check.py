@@ -87,28 +87,36 @@ def check_doubles(pages, findings):
             findings["check"].append(f'Doubled word "{word} {word}" on page {num}')
 
 
-def staff_names() -> set[str]:
-    """Names from the resume and profile indexes, so VS staff never get
-    flagged as typos. Works fine if the indexes aren't there."""
+def known_words() -> set[str]:
+    """Every word VS already uses, harvested from the resume and project
+    indexes. Works fine if the indexes aren't there.
+
+    The dictionary doesn't know Indiana place names, road names, or industry
+    acronyms, so it flagged Fortville, Cutsinger, Waldron, Elkhart and ACEC as
+    typos and suggested "orville", "cunninger", "caldron", "eckhart" and "ace".
+    Six of eight findings on a real LOI were noise like that, which buries the
+    two that matter. Those words are all over the project profiles already, so
+    the indexes make a better allowlist than any list we'd maintain by hand.
+
+    Tradeoff: a misspelling that appears in a project profile gets whitelisted
+    here too. Worth it - a checker nobody reads catches nothing.
+    """
     import json
-    names = set()
+    words = set()
     for index in (ROOT / "resumes_index.json", ROOT / "profiles_index.json"):
         if index.exists():
-            for entry in json.loads(index.read_text(encoding="utf-8")):
-                for field in ("person", "people"):
-                    val = entry.get(field, [])
-                    for name in ([val] if isinstance(val, str) else val):
-                        names.update(w.lower() for w in re.findall(r"[A-Za-z]{2,}", name))
-                        # "DylanBarthel" -> dylan, barthel
-                        names.update(w.lower() for w in re.findall(r"[A-Z][a-z]+", name))
-    return names
+            blob = index.read_text(encoding="utf-8")
+            words.update(w.lower() for w in re.findall(r"[A-Za-z]{2,}", blob))
+            # "DylanBarthel" -> dylan, barthel
+            words.update(w.lower() for w in re.findall(r"[A-Z][a-z]+", blob))
+    return words
 
 
 def check_spelling(pages, ok_words, findings):
     """Flag words the dictionary doesn't know. Names get flagged too -
     add them to checks.yaml once and they stay quiet."""
     spell = SpellChecker()
-    ok = {w.lower() for w in ok_words} | staff_names()
+    ok = {w.lower() for w in ok_words} | known_words()
     spell.word_frequency.load_words(ok)
     counts = Counter()
     first_page = {}

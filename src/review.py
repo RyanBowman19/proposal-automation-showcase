@@ -4,6 +4,7 @@ at a time, so you don't have to run src.check and src.compare separately.
     py -m src.review "2605 Item 5"
     py -m src.review "2605 Item 5" --against 1
     py -m src.review "2604 Item 11" --vs "C:\\path\\to\\draft-loi.pdf"
+    py -m src.review "2605 Item 5" --competitor "C:\\path\\to\\their-loi.pdf"
 
 Everything lands together in output/<pursuit slug>/.
 Needs an Anthropic API key the first time (see src/compare.py).
@@ -20,7 +21,7 @@ from . import check, compare
 
 def review(pursuit: str, against: str, vs_path: str | None, client: str,
            rfp_override: str | None, item_override: str | None,
-           max_pages: int | None) -> Path:
+           max_pages: int | None, competitor_path: str | None = None) -> Path:
     # bench_rfp/bench_item say whose competitor data to compare against.
     # check_rfp/check_item say what number the mistake checker should
     # actually expect in the footer - only the same thing when you're not
@@ -72,15 +73,19 @@ def review(pursuit: str, against: str, vs_path: str | None, client: str,
     check_path = out_dir / "mistake-check.txt"
     check_path.write_text(report_text, encoding="utf-8")
 
-    print(f"\n=== Comparing against {pursuit}'s ranked competitor(s) ===")
-    if against.lower() == "all":
-        ranks = compare.available_ranks(bench_rfp, bench_item)
-        if not ranks:
-            sys.exit(f"No competitors found for {pursuit}")
+    if competitor_path:
+        print(f"\n=== Comparing against the uploaded competitor LOI ===")
+        ranks = [None]
     else:
-        ranks = [int(against)]
+        print(f"\n=== Comparing against {pursuit}'s ranked competitor(s) ===")
+        if against.lower() == "all":
+            ranks = compare.available_ranks(bench_rfp, bench_item)
+            if not ranks:
+                sys.exit(f"No competitors found for {pursuit}")
+        else:
+            ranks = [int(against)]
 
-    out_paths = [compare.run(pursuit, rank, str(vs)) for rank in ranks]
+    out_paths = [compare.run(pursuit, rank, str(vs), competitor_path) for rank in ranks]
 
     print(f"\nDone. Everything for this pursuit is in {out_dir}")
     print(f"  {check_path}")
@@ -99,6 +104,9 @@ def main() -> int:
                         help='competitor rank: 1 = winner, 2, 3, or "all" (default)')
     parser.add_argument("--vs", help="Path to a draft LOI, if it isn't filed "
                         "under reference/proposal-analysis/VS Proposals yet")
+    parser.add_argument("--competitor", help="Path to a specific competitor LOI "
+                        "to compare against, instead of whichever is on file. "
+                        "Ignores --against when given.")
     parser.add_argument("--client", default="INDOT")
     parser.add_argument("--rfp", help="Override the RFP number the mistake "
                         "checker expects (only needed if it can't guess it "
@@ -110,11 +118,13 @@ def main() -> int:
 
     try:
         review(args.pursuit, args.against, args.vs, args.client,
-               args.rfp, args.item, args.max_pages)
+               args.rfp, args.item, args.max_pages, args.competitor)
     except compare.anthropic.AuthenticationError:
-        sys.exit("API key is missing or wrong. Set it with:\n"
+        # A key IS set, but Anthropic rejected it.
+        sys.exit("API key is set but Anthropic rejected it (wrong or revoked). "
+                 "Get a fresh one at console.anthropic.com, then:\n"
                  '  setx ANTHROPIC_API_KEY "sk-ant-..."\n'
-                 "then open a new window. Keys: console.anthropic.com")
+                 "then open a new window.")
     except TypeError as exc:
         if "auth" in str(exc).lower():
             sys.exit("No API key set. Run:\n"

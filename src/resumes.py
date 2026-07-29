@@ -1,6 +1,6 @@
 """Search staff resumes by any word in them.
 
-    py -m src.resumes index "P:\\Marketing\\RESUMES\\Master Resumes_Multidisciplines"
+    py -m src.resumes index "<drive>:\\path\\to\\Master Resumes"
     py -m src.resumes search signals
 
 Folders starting with _ are skipped (old files, people who left).

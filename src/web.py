@@ -1,6 +1,6 @@
 """The search page. Run with Search Projects.bat (or py -m src.web).
 
-Other computers can open it at the address this prints on startup.
+Other computers can open it at http://<this pc's ip>:8765.
 Search only - nothing here can change the source files. The LOI Tools tab
 is the exception: it saves an uploaded PDF and writes reports to output/,
 using src.check/src.compare/src.review under the hood.
@@ -56,6 +56,7 @@ PAGE = """<!doctype html>
   .path { color: #888; font-size: 12px; word-break: break-all; }
   .actions { margin-top: 6px; }
   .actions button { font-size: 12px; margin-right: 8px; cursor: pointer; }
+  .actions .note { font-size: 12px; color: #2a6db0; }
   #count { color: #555; margin-bottom: 14px; }
   #loi-panel label { display: block; margin: 14px 0 4px; font-size: 14px; }
   #loi-panel input, #loi-panel select { font-size: 14px; padding: 6px 8px; }
@@ -87,11 +88,22 @@ PAGE = """<!doctype html>
 <div id="count"></div>
 <div id="results"></div>
 <div id="loi-panel" style="display:none">
-  <p class="hint">Add an LOI PDF - it gets checked for mistakes, then
-  compared against past ranked competitors for that same RFP/item, using AI.</p>
+  <p class="hint">Add an LOI PDF - it gets checked for mistakes, then compared
+  against past ranked competitors for that same RFP/item, using AI. Or add a
+  specific competitor LOI below to compare against that one instead.</p>
   <form id="loiForm">
     <label>LOI to check
       <input type="file" id="loiFile" accept="application/pdf" required>
+    </label>
+    <label>Competitor LOI to compare against (optional - leave blank to use
+      whichever past competitors are already on file)
+      <input type="file" id="competitorFile" accept="application/pdf">
+    </label>
+    <label>Or compare against a past winner in the same discipline (optional -
+      useful when there's no past pursuit with the exact same RFP/item)
+      <select id="benchPursuit">
+        <option value="">— use my file's own RFP/item —</option>
+      </select>
     </label>
     <details>
       <summary>More options</summary>
@@ -108,9 +120,6 @@ PAGE = """<!doctype html>
 </div>
 <script>
 const q = document.getElementById('q');
-// The Open-folder button pops Explorer on the machine running the server,
-// so only show it when you're browsing from that machine.
-const isLocal = ['127.0.0.1', 'localhost'].includes(location.hostname);
 let tab = 'projects';
 let timer;
 const HINTS = {
@@ -135,9 +144,35 @@ function setTab(name) {
     document.getElementById('hint').innerHTML = HINTS[name];
     q.focus();
     run();
+  } else if (name === 'loi' && !winnersLoaded) {
+    loadWinners();
   }
 }
 setTab('projects');
+
+let winnersLoaded = false;
+
+async function loadWinners() {
+  const sel = document.getElementById('benchPursuit');
+  try {
+    const res = await fetch('/api/winners');
+    const byDiscipline = await res.json();
+    for (const discipline in byDiscipline) {
+      const group = document.createElement('optgroup');
+      group.label = discipline;
+      for (const w of byDiscipline[discipline]) {
+        const opt = document.createElement('option');
+        opt.value = w.pursuit;
+        opt.textContent = `${w.who} — ${w.pursuit}`;
+        group.appendChild(opt);
+      }
+      sel.appendChild(group);
+    }
+    winnersLoaded = true;
+  } catch (e) {
+    // leave just the default option - not critical if this fails
+  }
+}
 
 q.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(run, 250); });
 
@@ -185,18 +220,132 @@ function fileBits(file) {
   return `
     <div class="path">${esc(file)}</div>
     <div class="actions">
-      ${isLocal ? `<button onclick="openFolder('${jsq(file)}')">Open folder</button>` : ''}
-      <button onclick="navigator.clipboard.writeText('${jsq(file)}')">Copy path</button>
+      <button onclick="openFolder(this, '${jsq(file)}')"
+        title="Opens the folder this file is in.">Open folder</button>
+      <button onclick="copyPath(this, '${jsq(file)}')">Copy path</button>
     </div>`;
 }
 
-async function openFolder(path) { await fetch('/api/open?path=' + encodeURIComponent(path)); }
+// Three ways to open a folder, tried best-first. A web page has no way to
+// reach the desktop itself - browsers refuse to follow a file:// link from an
+// http:// page - so every route needs someone else to do the opening:
+//   1. the server, when you're at the host PC (nothing to install)
+//   2. the vsfolder: handler, on any PC that ran Enable Open Folder.bat
+//   3. the clipboard, so you can paste the folder into Explorer yourself
+async function openFolder(btn, file) {
+  // 1. The server knows whether you're on its machine; don't guess from the URL.
+  try {
+    const res = await fetch('/api/open?path=' + encodeURIComponent(file));
+    if (res.ok && (await res.json()).opened) {
+      flash(btn, 'Opening');
+      return;
+    }
+  } catch (e) { /* server unreachable - the routes below don't need it */ }
+
+  // 2. Chromium ignores an unregistered scheme quietly. Firefox pops its own
+  // error box instead, so don't even try there.
+  const handlerTried = !!window.chrome;
+  if (handlerTried) tryHandler(file);
+
+  // 3. Always copy as well, so there's something to fall back on.
+  const ok = await copyText(folderOf(file));
+  if (!ok) selectText(btn.closest('.actions').previousElementSibling);
+
+  // If the handler is installed, Explorer takes the focus - that's the only
+  // signal we get that it worked, and it decides the wording only. Saying
+  // "paste it" when the folder already opened is what made this look broken.
+  if (handlerTried && !(await stillFocused())) {
+    flash(btn, 'Opening');
+    return;
+  }
+  flash(btn, ok ? 'Copied - paste in Explorer' : 'Press Ctrl+C');
+}
+
+// False means something else took the focus - on this page that means the
+// vsfolder: handler launched Explorer.
+function stillFocused() {
+  return new Promise(resolve =>
+    setTimeout(() => resolve(document.hasFocus()), 700));
+}
+
+// Fire the vsfolder: link inside a throwaway iframe rather than assigning
+// window.location. Same handoff, but a browser with no handler registered
+// cannot disturb the page the user is looking at - assigning location starts
+// a real navigation and tears the page's JS context down mid-click.
+function tryHandler(file) {
+  const frame = document.createElement('iframe');
+  frame.style.display = 'none';
+  frame.src = 'vsfolder:' + encodeURIComponent(file);
+  document.body.appendChild(frame);
+  setTimeout(() => frame.remove(), 2000);
+}
+
+function folderOf(file) {
+  const cut = Math.max(file.lastIndexOf('\\\\'), file.lastIndexOf('/'));
+  return cut > 0 ? file.slice(0, cut) : file;
+}
+
+// Say what happened next to the buttons. Relabelling the button itself made
+// it grow and shove the other button sideways on every click.
+function flash(btn, message) {
+  const row = btn.closest('.actions');
+  let note = row.querySelector('.note');
+  if (!note) {
+    note = document.createElement('span');
+    note.className = 'note';
+    row.appendChild(note);
+  }
+  note.textContent = message;
+  clearTimeout(note.timer);
+  note.timer = setTimeout(() => note.remove(), 2500);
+}
+
+// navigator.clipboard only exists in a "secure context" - https:// or
+// localhost. Over the LAN (http://<ip>:8765) it is undefined, so the old
+// inline navigator.clipboard.writeText() threw and Copy path silently did
+// nothing for everyone except someone sitting at the host PC. Fall back to
+// the hidden-textarea + execCommand trick, which plain http still allows.
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try { await navigator.clipboard.writeText(text); return true; } catch (e) { /* fall through */ }
+  }
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly', '');
+  ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+  document.body.appendChild(ta);
+  ta.select();
+  ta.setSelectionRange(0, ta.value.length);
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  ta.remove();
+  return ok;
+}
+
+// Both fallbacks can still be refused (locked-down browser policy), so say
+// so on the button instead of failing quietly, and select the path text on
+// the page so Ctrl+C works by hand.
+async function copyPath(btn, path) {
+  const ok = await copyText(path);
+  if (!ok) selectText(btn.closest('.actions').previousElementSibling);
+  flash(btn, ok ? 'Copied' : 'Press Ctrl+C');
+}
+
+function selectText(el) {
+  if (!el) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  const sel = window.getSelection();
+  sel.removeAllRanges();
+  sel.addRange(range);
+}
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function jsq(s) { return s.replace(/\\\\/g, '\\\\\\\\').replace(/'/g, "\\\\'"); }
 
 // --- LOI Tools tab: upload a PDF and it gets checked + compared. The
-// pursuit (which competitor data to benchmark against) is guessed on the
-// server from the file's own name - no picking from a list.
+// pursuit (which competitor data to benchmark against) is normally guessed
+// from the file's own name, unless benchPursuit picks a different one
+// (a past winner in the same discipline).
 
 let loiPollTimer;
 
@@ -209,6 +358,10 @@ document.getElementById('loiForm').addEventListener('submit', async (e) => {
 
   const fd = new FormData();
   fd.append('file', file);
+  const competitorFile = document.getElementById('competitorFile').files[0];
+  if (competitorFile) fd.append('competitor_file', competitorFile);
+  const benchPursuit = document.getElementById('benchPursuit').value;
+  if (benchPursuit) fd.append('bench_pursuit', benchPursuit);
   fd.append('client', document.getElementById('client').value);
   fd.append('rfp', document.getElementById('rfpOverride').value);
   fd.append('item', document.getElementById('itemOverride').value);
@@ -321,7 +474,7 @@ class _JobLog(io.TextIOBase):
         return len(s)
 
 
-def _run_job(job_id, pursuit, against, vs_path, client, rfp, item, max_pages):
+def _run_job(job_id, pursuit, against, vs_path, client, rfp, item, max_pages, competitor_path=None):
     out_dir = compare.out_dir_for(pursuit)
     with JOBS_LOCK:
         JOBS[job_id]["out_dir"] = str(out_dir)
@@ -334,12 +487,14 @@ def _run_job(job_id, pursuit, against, vs_path, client, rfp, item, max_pages):
     error = None
     try:
         with contextlib.redirect_stdout(_JobLog(job_id)):
-            review.review(pursuit, against, vs_path, client, rfp, item, max_pages)
+            review.review(pursuit, against, vs_path, client, rfp, item, max_pages, competitor_path)
     except SystemExit as exc:
         error = str(exc.code) if exc.code else "Failed - see log."
     except compare.anthropic.AuthenticationError:
-        error = "No Anthropic API key set on this server yet."
+        # A key IS set, but Anthropic rejected it - wrong/revoked/typo'd.
+        error = "The Anthropic API key on this server is invalid - check it was typed correctly."
     except TypeError as exc:
+        # No key found in the environment at all.
         error = ("No Anthropic API key set on this server yet."
                   if "auth" in str(exc).lower() else f"Unexpected error: {exc}")
     except Exception as exc:  # keep whatever partial results exist either way
@@ -399,13 +554,22 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, json.dumps(results).encode("utf-8"), "application/json")
         elif url.path == "/api/open":
             path = parse_qs(url.query).get("path", [""])[0]
-            if path in self._known_files():
+            if path not in self._known_files():
+                self._send(403, b"unknown file", "text/plain")
+            elif not self._from_host():
+                # Explorer would open on this machine's screen, not theirs, so
+                # don't - just tell the page so it can fall back.
+                self._send(200, json.dumps({"opened": False}).encode("utf-8"),
+                           "application/json")
+            else:
                 # Show the file in Explorer rather than opening it in Word —
                 # the source docs must never be edited.
                 subprocess.Popen(["explorer", "/select,", path])
-                self._send(200, b"ok", "text/plain")
-            else:
-                self._send(403, b"unknown file", "text/plain")
+                self._send(200, json.dumps({"opened": True}).encode("utf-8"),
+                           "application/json")
+        elif url.path == "/api/winners":
+            self._send(200, json.dumps(compare.winners_by_discipline()).encode("utf-8"),
+                       "application/json")
         elif url.path == "/api/job":
             job_id = parse_qs(url.query).get("id", [""])[0]
             with JOBS_LOCK:
@@ -474,13 +638,23 @@ class Handler(BaseHTTPRequestHandler):
         item_override = fields.get("item") or None
         guessed_rfp, guessed_item = check.expected_from_filename(filename)
         rfp, item = rfp_override or guessed_rfp, item_override or guessed_item
-        if not rfp or not item:
-            self._send(400, (
-                "Couldn't tell the RFP/item number from that filename. Rename "
-                'it to include both (e.g. "RFP 2605 Item 5 LOI.pdf") and try again.'
-            ).encode("utf-8"), "text/plain")
-            return
-        pursuit = f"{rfp} Item {item}"
+
+        bench_pursuit = fields.get("bench_pursuit") or None
+        if bench_pursuit:
+            # Comparing against a winner in a different discipline pursuit -
+            # the mistake checker still uses the file's own real RFP/item
+            # (guessed above, or the override fields), just the comparison
+            # benchmark is different.
+            pursuit, against = bench_pursuit, "1"
+        else:
+            if not rfp or not item:
+                self._send(400, (
+                    "Couldn't tell the RFP/item number from that filename. Rename "
+                    'it to include both (e.g. "RFP 2605 Item 5 LOI.pdf"), or pick '
+                    "a discipline to compare against below."
+                ).encode("utf-8"), "text/plain")
+                return
+            pursuit, against = f"{rfp} Item {item}", "all"
 
         job_id = uuid.uuid4().hex
         # Keep the real filename (spaces and all) - the mistake checker just
@@ -493,6 +667,16 @@ class Handler(BaseHTTPRequestHandler):
         vs_path = str(upload_dir / Path(filename).name)
         Path(vs_path).write_bytes(content)
 
+        competitor_path = None
+        comp_upload = fields.get("competitor_file")
+        if isinstance(comp_upload, tuple) and comp_upload[0]:
+            comp_filename, comp_content = comp_upload
+            if not comp_filename.lower().endswith(".pdf"):
+                self._send(400, b"Competitor LOI must be a PDF.", "text/plain")
+                return
+            competitor_path = str(upload_dir / Path(comp_filename).name)
+            Path(competitor_path).write_bytes(comp_content)
+
         max_pages_raw = fields.get("max_pages", "")
         max_pages = int(max_pages_raw) if max_pages_raw.strip().isdigit() else None
 
@@ -502,11 +686,33 @@ class Handler(BaseHTTPRequestHandler):
                             "mistake_check": None}
         threading.Thread(
             target=_run_job,
-            args=(job_id, pursuit, "all", vs_path, fields.get("client") or "INDOT",
-                  rfp_override, item_override, max_pages),
+            args=(job_id, pursuit, against, vs_path, fields.get("client") or "INDOT",
+                  rfp_override, item_override, max_pages, competitor_path),
             daemon=True,
         ).start()
         self._send(200, json.dumps({"job_id": job_id}).encode("utf-8"), "application/json")
+
+    def _from_host(self) -> bool:
+        """Is this request coming from the machine running the server?
+
+        Only then is opening Explorer any use - the window appears on this
+        screen. The page used to decide this from location.hostname, which got
+        it wrong for the most common case: someone sitting at the host PC who
+        browsed to the http://<ip> address printed in the black window instead
+        of localhost. They'd be told to paste a path while the server sat there
+        able to open the folder for them. The server knows who's asking, so let
+        it answer. It also stops a coworker popping Explorer windows on the
+        host's screen from across the office.
+        """
+        client = self.client_address[0]
+        if client in ("127.0.0.1", "::1"):
+            return True
+        own = set()
+        with contextlib.suppress(OSError):
+            own.add(lan_ip())
+        with contextlib.suppress(OSError):
+            own.update(socket.gethostbyname_ex(socket.gethostname())[2])
+        return client in own
 
     @classmethod
     def _known_files(cls):

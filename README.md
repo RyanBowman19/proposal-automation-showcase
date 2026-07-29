@@ -1,158 +1,116 @@
 # Proposal Automation
 
-*This is a public showcase copy of an internal VS Engineering tool. Real
-client data, resume/project content, and individual staff names have been
-removed or replaced with placeholders - the code and workflow are real,
-the private company data behind it is not.*
+*Public copy of an internal tool I built at VS Engineering. The code and the
+workflow are real. Client data, staff names, project content and network
+paths have been replaced with placeholders.*
 
-Tools to save the proposal coordinator time on LOIs.
-
-## See it in action
+Our proposal coordinator writes Letters of Interest for INDOT bids. Three
+things ate her time: digging through a network drive for past projects and
+resumes worth reusing, proofreading a finished PDF before it went out, and
+never really knowing why the firm that won scored better than us. These
+tools do those three things.
 
 ![Search demo](demo_data/vs-search-demo.gif)
 
-That's the real server, running against fake sample data (demo_data/) instead
-of real company files - a couple of made-up resumes and project profiles.
-To run it yourself:
+## Try it
+
+There's fake sample data in `demo_data/` so the whole thing runs without any
+company files:
 
     py -m pip install -r requirements.txt
     py -m src.resumes index demo_data/resumes
     py -m src.profiles index demo_data/profiles
     py demo_data/run_demo_server.py
 
-Then open the address it prints in the console. The LOI Tools tab is in there too - upload
-demo_data/Sample-Draft-LOI.pdf and it'll catch the wrong RFP number and
-typos planted in it. The AI comparison half needs an Anthropic API key to
-actually run (see the LOI comparison section below), so it's not in the demo.
+Open the address it prints. Search works straight away. On the LOI Tools tab,
+upload `demo_data/Sample-Draft-LOI.pdf` and the checker will find the wrong
+RFP number and the typos planted in it.
 
-## Status
+The AI comparison needs an Anthropic API key, so it isn't part of the demo.
 
-1. Project + resume search - DONE
-2. PDF mistake checker - DONE
-3. Meeting notes from recordings - not started
-4. Deadline reminders - not started
-5. LOI comparison vs INDOT winners - built, needs an API key to run
+## What's in it
 
-`src/main.py` is an old proposal drafter, ignore it.
+**Search** (`src/profiles.py`, `src/resumes.py`) indexes a few thousand
+project profiles and staff resumes off the shared drives and full-text
+searches them. Project profiles get tagged by service, region and client from
+word lists in `tags.yaml`, so you can search `trail lebanon` or `bridge
+central_indiana`.
 
-## How the pieces fit together
+The resume template turned out to lay everything out in Word text boxes,
+which python-docx reads as empty. Had to parse the raw `document.xml` for
+`w:t` nodes instead.
 
-- **Search** - find people and past projects to reuse while writing an LOI.
-- **Check** (tool 2) - catch mistakes in a finished LOI before it goes out.
-- **Compare** (tool 5) - see why a winning firm's LOI scored better than ours.
-- **Review** - runs Check and Compare together in one command.
+**Mistake checker** (`src/check.py`) reads a finished LOI PDF and flags wrong
+RFP or item numbers, a client name left over from a reused template, doubled
+words, page-limit overruns and likely typos. It earned its keep on the first
+real run: `RFP 2506` in the footer of every page of a 2605 LOI.
 
-Everyday use: all four live on the same web page (the **LOI Tools** tab
-described below) - no command line needed. The commands further down are
-for editing checks.yaml/questions.yaml, automation, or troubleshooting.
+Spell checking a document full of Indiana place names is mostly a fight
+against false positives. It flagged Fortville, Cutsinger, Waldron and ACEC and
+suggested "orville", "cunninger", "caldron" and "ace". Six of eight findings
+were noise, which buries the two that matter. The fix was to build the
+allowlist out of the project and resume indexes the tool had already made —
+those words are all over our own project write-ups, so the corpus is a better
+list than one maintained by hand. Same document now reports two findings, both
+real typos.
 
-## Setup
+**Comparison** (`src/compare.py`) puts our LOI next to a competitor's and asks
+Claude the same set of questions about each section — cover letter, project
+manager, technical approach, experience, graphics. The scoring criteria go
+into the prompt; the actual scores stay out, so it isn't just working
+backwards from the result.
 
-    py -m pip install -r requirements.txt
+Two things worth mentioning here. Each LOI goes in as extracted text *and* as
+an image of every page — without the pages you can't say anything real about
+layout or exhibits, and it was reduced to inferring charts from stray
+captions. Sending the PDFs directly doesn't work: ours run to 15MB of
+print-resolution artwork and three of them exceed the API's 32MB request
+limit, so pages get re-rendered at screen resolution first, which costs about
+a megabyte and loses nothing a scorer could see.
 
-Use `py`, not `python`.
+The other thing is that both documents are sales pitches. An early version
+read a competitor's claim about site conditions, concluded we'd got a fact
+wrong, and recommended we drop a design item — on nothing but their say-so.
+It reports disagreements as disagreements to check now.
 
-## Search
+**Review** (`src/review.py`) runs the checker and the comparison together.
 
-Double-click **Search Projects.bat**. Two tabs: Projects and Resumes.
-Type "signals" in Resumes to find people with signal experience.
-Leave the black window open - closing it stops the search.
+Everything is on one web page (`src/web.py`) — plain `http.server`, no
+framework — so nobody has to touch a command line.
 
-Other office computers: use the address shown in the black window.
-First time, click Allow on the firewall popup.
+## Opening a folder from a web page
 
-Remote users: need the VPN, or just copy this folder to their laptop
-and run it there.
+The search results list a file's path on the shared drive, and the obvious
+next thing to want is a button that opens that folder. This is harder than it
+sounds: a browser will not follow a `file://` link from an `http://` page, and
+gives JavaScript no other way to reach the desktop. There's no clever
+workaround — something outside the browser has to do the opening.
 
-To host it on an office PC: run **Setup Server.bat** once as
-administrator. After that it starts itself on every boot, even with
-nobody signed in.
+So the button tries three things in order:
 
-When files change on the drives, double-click **Update Index.bat**.
+1. Ask the server. It compares the requester's IP against its own, and if
+   you're at the machine hosting the page it opens Explorer itself. Nothing to
+   install. (The first version guessed this from `location.hostname` and only
+   accepted `localhost`, so anyone browsing by IP — which is the address the
+   server prints on startup — got told they were remote.)
+2. Hand off to a `vsfolder:` handler, on any PC where the one-time registry
+   entry has been installed. `open-folder.vbs` decodes the path, refuses
+   anything that isn't a real file or folder, and opens Explorer.
+3. Copy the folder to the clipboard so it can be pasted into Explorer.
 
-Wrong tags on projects: edit the word lists in `tags.yaml`.
-Resume folders starting with `_` (old stuff, people who left) are skipped.
+`Install Open Folder (all users).ps1` installs the handler for every user of a
+machine, which is the version you hand to Intune or an RMM tool.
+`Deploy Open Folder.ps1` pushes it to a list of computers over PowerShell
+remoting. `Enable Open Folder.bat` does one user, no admin rights needed.
+Nothing is ever asked of staff — a PC without the handler just falls back to
+the clipboard.
 
-## LOI Tools tab (check + compare, on the same web page)
+## Notes
 
-The **LOI Tools** tab on that same search page runs the mistake checker
-and the comparison tool - no command line, no drag-and-drop, no digging
-through `output\`. Everyone with the search page URL can use it, including
-remote staff over VPN.
+`py`, not `python`, on Windows.
 
-1. Add the LOI PDF.
-2. Hit Check & Compare. It checks the PDF for mistakes, then compares it
-   against every ranked competitor for that same RFP/item - reads out live
-   as it works, since the AI comparison takes a minute or two.
-3. Results show right on the page: the mistake-check findings, and each
-   comparison report in full, with a "Download as Word doc" link if you
-   want to save or forward it.
+`reference/` and `output/` aren't in git — that's where the real LOIs,
+competitor documents and generated reports live.
 
-Which pursuit to compare against isn't picked manually - it's guessed from
-the RFP/item number in the file's own name (the same way the mistake
-checker already guesses it). If a filename doesn't have both numbers in it,
-rename it (e.g. "RFP 2605 Item 5 LOI.pdf") or use the RFP/Item override
-fields under "More options."
-
-This is the same src.review under the hood - see below for what it's
-actually doing and the command-line version (which does let you pick the
-pursuit and rank manually, for benchmarking a draft against a different
-past pursuit than its own).
-
-## Mistake checker (tool 2)
-
-Drag a finished LOI PDF onto **Check LOI.bat** before it goes out.
-Catches wrong RFP/item numbers, wrong client names, doubled words,
-page limit, and likely typos. It found a real one: "RFP 2506" in every
-footer of our 2605 LOI.
-
-Command line:
-
-    py -m src.check "path\to\LOI.pdf" --client INDOT --max-pages 12
-
-False alarms: add the word to `checks.yaml` and it stays quiet.
-VS staff names are already quiet (pulled from the resume index).
-
-## LOI comparison (tool 5)
-
-Compares our LOI against a competitor's, section by section, using AI.
-Same questions every run (edit `questions.yaml`). Scores stay out of the
-prompt to avoid bias.
-
-    py -m src.compare "2605 Item 5"                # vs the winner (default)
-    py -m src.compare "2604 Item 4" --against 2      # vs 2nd place
-    py -m src.compare "2605 Item 5" --against all    # vs every ranked competitor
-
-For a draft LOI that hasn't been submitted or scored yet, use `--vs` to
-point at it, and pick whichever finished pursuit is the closest match to
-benchmark against:
-
-    py -m src.compare "2605 Item 5" --vs "C:\path\to\draft-loi.pdf"
-
-Everything for a pursuit lands together in `output\<pursuit slug>\`, as a
-Word doc (double-click to open) plus a matching `.md` file. Needs an
-Anthropic API key once (console.anthropic.com, runs cost cents):
-
-    setx ANTHROPIC_API_KEY "sk-ant-..."
-
-Source files come from the marketing team's folder, copied to
-`reference/proposal-analysis/`. When they add a new pursuit, copy it in
-with the same layout (Competitors/<rfp> Item <n>/, VS Proposals/).
-
-## Review - check and compare together (src/review.py)
-
-Runs the mistake checker and the comparison tool in one go, so you don't
-have to run tools 2 and 5 separately. Or double-click **Review Pursuit.bat**.
-
-    py -m src.review "2605 Item 5"
-    py -m src.review "2604 Item 11" --vs "C:\path\to\draft-loi.pdf"
-
-With `--vs`, the mistake checker still checks the draft's own real
-RFP/item numbers (guessed from its filename, or pass `--rfp`/`--item`) -
-not the pursuit you're benchmarking against. A draft for a new RFP
-shouldn't get flagged for not matching an old pursuit's number.
-
-## Reference
-
-`reference/` - not in git. Go/no-go policy, example LOIs, RFPs, and
-the marketing team's proposal analysis folder.
+Report rendering (`markdown_to_docx`, `markdown_to_html`) shares one parser so
+the Word file and the web page can't drift apart.
