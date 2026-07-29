@@ -22,7 +22,7 @@ $helper = @'
 '
 ' Enable Open Folder.bat registers this script as the handler for vsfolder:
 ' links, so Windows hands us the whole link as one argument, like:
-'   vsfolder:%5C%5CEgnyteDrive%5C...%5CBig%204%20Trail.docx
+'   vsfolder:%5C%5CFILESERVER%5C...%5CSample%20Project.docx
 '
 ' We decode that back into a real path and show it in Explorer. Anything that
 ' is not a file or folder already sitting on this PC's drives is refused -
